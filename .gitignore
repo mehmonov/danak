@@ -1,3 +1,6 @@
 __pycache__/
 /*.pyc
 migrations/
+danak.egg-info
+dist/
+build/

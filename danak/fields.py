@@ -1,6 +1,7 @@
 from typing import Any, List, Type, Optional
 from datetime import datetime
-from .validators import ValidationError, Validator
+from .validators import (ValidationError, Validator, MinValueValidator,
+                      MaxValueValidator, MaxLengthValidator)
 
 class Field:
     def __init__(self, field_type: type, primary_key: bool = False, 
@@ -87,10 +88,11 @@ class DateTimeField(Field):
         super().__init__(datetime, False, nullable, False, validators)
         self.auto_now = auto_now
         self.auto_now_add = auto_now_add
+        self._set = False
 
     def to_db_value(self, value: datetime) -> str:
         if value is None:
-            if self.auto_now or (self.auto_now_add and not hasattr(self, '_set')):
+            if self.auto_now or (self.auto_now_add and not self._set):
                 value = datetime.now()
                 self._set = True
             else:

@@ -36,7 +36,7 @@ class QuerySet(Generic[T]):
         return QuerySet(self.model_class, new_conditions, self.order_by,
                        self.limit, self.offset)
 
-    def order_by(self, *fields) -> 'QuerySet[T]':
+    def order_by_fields(self, *fields) -> 'QuerySet[T]':
         new_order = self.order_by.copy()
         for field in fields:
             if field.startswith('-'):
@@ -86,7 +86,7 @@ class QuerySet(Generic[T]):
 
     def last(self) -> Optional[T]:
         if not self.order_by:
-            qs = self.order_by('-id')
+            qs = self.order_by_fields('-id')
         else:
             new_order = []
             for field, direction in self.order_by:
@@ -141,3 +141,34 @@ class QuerySet(Generic[T]):
             'isnull': 'IS' if True else 'IS NOT'
         }
         return operators.get(op, '=')
+
+    def _get_not_operator(self, op: str) -> str:
+        operators = {
+            'lt': '>=',
+            'lte': '>',
+            'gt': '<=',
+            'gte': '<',
+            'in': 'NOT IN',
+            'contains': 'NOT LIKE',
+            'startswith': 'NOT LIKE',
+            'endswith': 'NOT LIKE',
+            'range': 'NOT BETWEEN',
+            'isnull': 'IS NOT' if True else 'IS'
+        }
+        return operators.get(op, '!=')
+
+    def __iter__(self):
+        if self._results is None:
+            query = self._build_query()
+            cursor = self.model_class._connection.execute(query[0], query[1])
+            rows = cursor.fetchall()
+            self._results = []
+            for row in rows:
+                instance = self.model_class()
+                for key in row.keys():
+                    if key in self.model_class._fields:
+                        field = self.model_class._fields[key]
+                        value = field.to_python_value(row[key])
+                        instance._data[key] = value
+                self._results.append(instance)
+        return iter(self._results)

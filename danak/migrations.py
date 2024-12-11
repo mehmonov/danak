@@ -39,13 +39,22 @@ class MigrationManager:
                 field_def = {
                     'type': field.__class__.__name__,
                     'nullable': field.nullable,
-                    'unique': field.unique
+                    'unique': field.unique,
+                    'validators': []
                 }
                 if field.primary_key:
                     field_def['primary_key'] = True
                 if hasattr(field, 'to_model'):
                     field_def['to_model'] = field.to_model
                     field_def['on_delete'] = field.on_delete
+                if field.validators:
+                    field_def['validators'] = [
+                        {
+                            'type': validator.__class__.__name__,
+                            'args': validator.__dict__
+                        }
+                        for validator in field.validators
+                    ]
                 fields[field_name] = field_def
 
             operations.append({
@@ -120,7 +129,18 @@ class MigrationManager:
             for name, field in operation['add_field'].items():
                 field_def = f"{name} {self._get_field_type(field)}"
                 if not field.get('nullable', True):
-                    field_def += " NOT NULL DEFAULT ''"
+                    if field['type'] == 'IntegerField':
+                        field_def += " NOT NULL DEFAULT 0"
+                    elif field['type'] == 'TextField':
+                        field_def += " NOT NULL DEFAULT ''"
+                    elif field['type'] == 'FloatField':
+                        field_def += " NOT NULL DEFAULT 0.0"
+                    elif field['type'] == 'BooleanField':
+                        field_def += " NOT NULL DEFAULT 0"
+                    elif field['type'] == 'DateTimeField':
+                        field_def += " NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    else:
+                        field_def += " NOT NULL"
                 query = f"ALTER TABLE {table_name} ADD COLUMN {field_def}"
                 self.connection.execute(query)
 

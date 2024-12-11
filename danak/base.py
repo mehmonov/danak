@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Type, TypeVar, Optional
 import sqlite3
 from datetime import datetime
-from .fields import Field
+from .fields import Field, ForeignKey
 from .query import QuerySet
 from .validators import ValidationError
 
@@ -155,6 +155,12 @@ class Model(metaclass=ModelMeta):
     def all(cls: Type[T]) -> QuerySet[T]:
         return QuerySet(cls)
 
+    @classmethod
+    def create(cls, **kwargs) -> 'Model':
+        instance = cls(**kwargs)
+        instance.save()
+        return instance
+
     def update(self, **kwargs) -> None:
         if not self._connection:
             raise Exception("Database connection not established")
@@ -202,7 +208,9 @@ class Model(metaclass=ModelMeta):
         self._connection.commit()
 
     @classmethod
-    def _get_model_class(cls, model_name: str) -> Type[T]:
+    def _get_model_class(cls, model_name: str) -> Type['Model']:
         """Get model class by name"""
-        # This is a simple implementation. In real world, you might want to use a registry
-        return globals()[model_name]
+        for subclass in cls.__subclasses__():
+            if subclass.__name__.lower() == model_name.lower():
+                return subclass
+        raise ValueError(f"Model {model_name} not found")
